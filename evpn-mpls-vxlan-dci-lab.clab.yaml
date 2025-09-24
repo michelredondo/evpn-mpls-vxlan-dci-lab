@@ -1,0 +1,115 @@
+name: dci-lab
+
+topology:
+  kinds:
+    linux:
+      image: quay.io/frrouting/frr:9.0.2
+
+  nodes:
+    dc1-srl-leaf1:
+      kind: srl
+      type: ixr-d2l
+      image: srlinux:25.7.1
+      startup-config: configs/dc1-srl-leaf1.txt
+    dc1-sros-dcgw1:
+      kind: nokia_srsim
+      type: sr-1
+      image: nokia_srsim:25.7.R2
+      license: license-srsim.txt
+      startup-config: configs/dc1-sros-dcgw1.partial.txt
+
+    dc2-junos-switch1:
+      kind: juniper_vjunosswitch
+      image: juniper_vjunos-switch:24.4R1.9
+      startup-config: configs/dc2-junos-switch1.txt
+
+    dc2-junos-dcgw1:
+      kind: juniper_vjunosrouter
+      image: juniper_vjunos-router:25.2R1.9
+      startup-config: configs/dc2-junos-dcgw1.txt
+
+    core-router:
+      kind: nokia_srsim
+      type: sr-1
+      image: nokia_srsim:25.7.R2
+      license: license-srsim.txt
+      startup-config: configs/core-router.partial.txt
+
+#### clients
+    ### DC1
+    dc1-cli1:
+     kind: linux
+     binds:
+        - configs/hostname.sh:/hostname.sh
+        - configs/daemons:/etc/frr/daemons
+     exec:
+        - bash /hostname.sh
+        - ip link add link eth1 name eth1.100 type vlan id 100
+        - ip link set dev eth1.100 address 00:11:00:00:00:01
+        - ip link set eth1.100 up
+        - ip address add 10.0.1.1/16 dev eth1.100
+        - ip route del 0.0.0.0/0
+    
+    dc1-cli2:
+     kind: linux
+     binds:
+        - configs/hostname.sh:/hostname.sh
+        - configs/daemons:/etc/frr/daemons
+     exec:
+        - bash /hostname.sh
+        - ip link add link eth1 name eth1.100 type vlan id 100
+        - ip link set dev eth1.100 address 00:11:00:00:00:02
+        - ip link set eth1.100 up
+        - ip address add 10.0.1.2/16 dev eth1.100
+        - ip route del 0.0.0.0/0      
+
+    ### DC2
+    dc2-cli1:
+     kind: linux
+     binds:
+        - configs/hostname.sh:/hostname.sh
+        - configs/daemons:/etc/frr/daemons
+     exec:
+        - bash /hostname.sh
+        - ip link add link eth1 name eth1.100 type vlan id 100
+        - ip link set dev eth1.100 address 00:22:00:00:00:01
+        - ip link set eth1.100 up
+        - ip address add 10.0.2.1/16 dev eth1.100
+        - ip route del 0.0.0.0/0
+    dc2-cli2:
+     kind: linux
+     binds:
+        - configs/hostname.sh:/hostname.sh
+        - configs/daemons:/etc/frr/daemons
+     exec:
+        - bash /hostname.sh
+        - ip link add link eth1 name eth1.100 type vlan id 100
+        - ip link set dev eth1.100 address 00:22:00:00:00:02
+        - ip link set eth1.100 up
+        - ip address add 10.0.2.2/16 dev eth1.100
+        - ip route del 0.0.0.0/0
+
+  links:
+    # underlay dc1
+    - endpoints: ["dc1-srl-leaf1:e1-49", "dc1-sros-dcgw1:1/1/c1/1"]
+
+    # legacy switching dc2
+    - endpoints: ["dc2-junos-switch1:eth1", "dc2-junos-dcgw1:eth1"]
+
+    # DC1-DCGWs- CORE
+    - endpoints: ["dc1-sros-dcgw1:1/1/c2/1", "core-router:1/1/c1/1"]
+    # DC2-DCGWs- CORE
+    - endpoints: ["dc2-junos-dcgw1:eth2", "core-router:1/1/c2/1"]
+
+    #### DC1 clients ####
+      # Leaf
+    - endpoints: ["dc1-cli1:eth1", "dc1-srl-leaf1:e1-1"]
+      # DCGW 
+    - endpoints: ["dc1-cli2:eth1", "dc1-sros-dcgw1:1/1/c3/1"]
+
+    #### DC2 clients ####
+      # switch
+    - endpoints: ["dc2-cli1:eth1", "dc2-junos-switch1:eth2"]
+      # DCGW 
+    - endpoints: ["dc2-cli2:eth1", "dc2-junos-dcgw1:eth3"]
+

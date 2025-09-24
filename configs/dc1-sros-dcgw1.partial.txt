@@ -1,0 +1,231 @@
+/configure card 1 card-type iom-1
+/configure card 1 mda 1 mda-type me6-100gb-qsfp28
+/configure card 1 mda 2 mda-type me12-100gb-qsfp28
+
+/configure port 1/1/c1 admin-state enable
+/configure port 1/1/c1 description "leaf1"
+/configure port 1/1/c1 connector breakout c1-100g
+/configure port 1/1/c1/1 admin-state enable
+/configure port 1/1/c1/1 description "leaf1"
+/configure port 1/1/c1/1 ethernet mode hybrid
+/configure port 1/1/c1/1 ethernet encap-type dot1q
+
+/configure port 1/1/c2 admin-state enable
+/configure port 1/1/c2 description "core"
+/configure port 1/1/c2 connector breakout c1-100g
+/configure port 1/1/c2/1 admin-state enable
+/configure port 1/1/c2/1 description "core"
+/configure port 1/1/c2/1 ethernet mode hybrid
+/configure port 1/1/c2/1 ethernet encap-type dot1q
+
+/configure router "Base" autonomous-system 65001
+
+/configure router "Base" interface "system" ipv4 icmp mask-reply false
+/configure router "Base" interface "system" ipv4 icmp redirects admin-state disable
+/configure router "Base" interface "system" ipv4 icmp unreachables admin-state disable
+/configure router "Base" interface "system" ipv4 bfd admin-state enable
+/configure router "Base" interface "system" ipv4 bfd transmit-interval 2000
+/configure router "Base" interface "system" ipv4 bfd receive 2000
+/configure router "Base" interface "system" ipv4 bfd type cpm-np
+/configure router "Base" interface "system" ipv4 primary address 10.255.1.1
+/configure router "Base" interface "system" ipv4 primary prefix-length 32
+/configure router "Base" interface "to-core.label" ip-mtu 9000
+/configure router "Base" interface "to-core.label" port 1/1/c2/1:1
+/configure router "Base" interface "to-core.label" tos-marking-state untrusted
+/configure router "Base" interface "to-core.label" ipv4 icmp mask-reply false
+/configure router "Base" interface "to-core.label" ipv4 icmp redirects admin-state disable
+/configure router "Base" interface "to-core.label" ipv4 icmp unreachables admin-state disable
+/configure router "Base" interface "to-core.label" ipv4 primary address 10.1.1.1
+/configure router "Base" interface "to-core.label" ipv4 primary prefix-length 31
+/configure router "Base" interface "to-leaf1" ip-mtu 9000
+/configure router "Base" interface "to-leaf1" port 1/1/c1/1:1
+/configure router "Base" interface "to-leaf1" ipv4 icmp mask-reply false
+/configure router "Base" interface "to-leaf1" ipv4 icmp redirects admin-state disable
+/configure router "Base" interface "to-leaf1" ipv4 icmp unreachables admin-state disable
+/configure router "Base" interface "to-leaf1" ipv4 bfd admin-state enable
+/configure router "Base" interface "to-leaf1" ipv4 bfd transmit-interval 2000
+/configure router "Base" interface "to-leaf1" ipv4 bfd receive 2000
+/configure router "Base" interface "to-leaf1" ipv4 bfd type cpm-np
+/configure router "Base" interface "to-leaf1" ipv4 primary address 192.168.111.0
+/configure router "Base" interface "to-leaf1" ipv4 primary prefix-length 31
+
+/configure router "Base" bgp connect-retry 2
+/configure router "Base" bgp min-route-advertisement 1
+/configure router "Base" bgp vpn-apply-export true
+/configure router "Base" bgp vpn-apply-import true
+/configure router "Base" bgp rapid-withdrawal true
+/configure router "Base" bgp ebgp-default-reject-policy import false
+/configure router "Base" bgp ebgp-default-reject-policy export false
+/configure router "Base" bgp rapid-update evpn true
+/configure router "Base" bgp backup-path ipv4 true
+/configure router "Base" bgp add-paths ipv4 send 4
+/configure router "Base" bgp add-paths ipv4 receive true
+/configure router "Base" bgp multipath max-paths 4
+/configure router "Base" bgp group "Core-LBGP" type external
+/configure router "Base" bgp group "Core-LBGP" peer-as 3456
+/configure router "Base" bgp group "Core-LBGP" label-preference 180
+/configure router "Base" bgp group "Core-LBGP" family label-ipv4 true
+/configure router "Base" bgp group "Core-LBGP" local-as as-number 65224
+/configure router "Base" bgp group "Core-LBGP" local-as prepend-global-as false
+/configure router "Base" bgp group "Core-LBGP" import policy ["SR:import-LBGP"]
+/configure router "Base" bgp group "Core-LBGP" export policy ["SR:export-LBGP"]
+/configure router "Base" bgp group "Core-LBGP" prefix-limit label-ipv4 maximum 8000
+/configure router "Base" bgp group "Core-LBGP" prefix-limit label-ipv4 threshold 50
+/configure router "Base" bgp group "Core-LBGP" prefix-limit label-ipv4 idle-timeout 5
+/configure router "Base" bgp group "Core-LBGP" prefix-limit label-ipv4 post-import true
+
+/configure router "Base" bgp group "overlay" vpn-apply-export true
+/configure router "Base" bgp group "overlay" vpn-apply-import true
+/configure router "Base" bgp group "overlay" type internal
+/configure router "Base" bgp group "overlay" peer-as 64512
+/configure router "Base" bgp group "overlay" bfd-liveness true
+/configure router "Base" bgp group "overlay" family evpn true
+/configure router "Base" bgp group "overlay" cluster cluster-id 10.255.1.1
+/configure router "Base" bgp group "overlay" local-as as-number 64512
+/configure router "Base" bgp group "overlay" import policy ["SR:import-overlay"]
+/configure router "Base" bgp group "overlay" export policy ["SR:export-overlay"]
+
+/configure router "Base" bgp group "underlay" type external
+/configure router "Base" bgp group "underlay" bfd-liveness true
+/configure router "Base" bgp group "underlay" split-horizon true
+/configure router "Base" bgp group "underlay" family ipv4 true
+/configure router "Base" bgp group "underlay" local-as as-number 65001
+/configure router "Base" bgp group "underlay" import policy ["SR:import-underlay"]
+/configure router "Base" bgp group "underlay" export policy ["SR:export-underlay"]
+
+/configure router "Base" bgp group "WAN-DC-EVPN" description "EVPN DC WAN"
+/configure router "Base" bgp group "WAN-DC-EVPN" min-route-advertisement 1
+/configure router "Base" bgp group "WAN-DC-EVPN" multihop 64
+/configure router "Base" bgp group "WAN-DC-EVPN" vpn-apply-export true
+/configure router "Base" bgp group "WAN-DC-EVPN" vpn-apply-import true
+/configure router "Base" bgp group "WAN-DC-EVPN" type internal
+/configure router "Base" bgp group "WAN-DC-EVPN" local-address 10.255.1.1
+/configure router "Base" bgp group "WAN-DC-EVPN" split-horizon true
+/configure router "Base" bgp group "WAN-DC-EVPN" family evpn true
+/configure router "Base" bgp group "WAN-DC-EVPN" local-as as-number 64512
+/configure router "Base" bgp group "WAN-DC-EVPN" local-as prepend-global-as false
+/configure router "Base" bgp group "WAN-DC-EVPN" import policy ["SR:import-DC-WAN"]
+/configure router "Base" bgp group "WAN-DC-EVPN" export policy ["SR:export-DC-WAN"]
+
+/configure router "Base" bgp neighbor "10.255.2.1" group "WAN-DC-EVPN"
+
+#/configure router "Base" bgp neighbor "10.255.1.2" import policy ["SR:import-overlay.dcgw"]
+#/configure router "Base" bgp neighbor "10.255.1.2" export policy ["SR:export-overlay.dcgw"]
+
+/configure router "Base" bgp neighbor "10.1.1.0" description "Core"
+/configure router "Base" bgp neighbor "10.1.1.0" group "Core-LBGP"
+
+/configure router "Base" bgp neighbor "192.168.1.1" description "Leaf1 overlay"
+/configure router "Base" bgp neighbor "192.168.1.1" group "overlay"
+
+/configure router "Base" bgp neighbor "192.168.111.1" description "Leaf1 underlay"
+/configure router "Base" bgp neighbor "192.168.111.1" group "underlay"
+/configure router "Base" bgp neighbor "192.168.111.1" local-address 192.168.111.0
+/configure router "Base" bgp neighbor "192.168.111.1" peer-as 65003
+
+/configure policy-options community "MACVRF1-RT" { member "target:64321:1" }
+
+/configure policy-options { prefix-list "SYS-AND-LOOPS" prefix 10.255.1.1/32 type exact }
+/configure policy-options policy-statement "SR:export-LBGP" entry 10 from prefix-list ["SYS-AND-LOOPS"]
+/configure policy-options policy-statement "SR:export-LBGP" entry 10 from protocol name [direct]
+/configure policy-options policy-statement "SR:export-LBGP" entry 10 action action-type accept
+/configure policy-options policy-statement "SR:export-LBGP" default-action action-type reject
+/configure policy-options policy-statement "SR:import-LBGP" default-action action-type accept
+
+
+/configure policy-options community "vxlan" { member "bgp-tunnel-encap:VXLAN" }
+/configure policy-options policy-statement "SR:import-overlay" default-action action-type accept
+/configure policy-options policy-statement "SR:import-overlay" default-action tag 1
+/configure policy-options policy-statement "SR:export-overlay" entry 200 from family [evpn]
+/configure policy-options policy-statement "SR:export-overlay" entry 200 from community name "vxlan"
+/configure policy-options policy-statement "SR:export-overlay" entry 200 action action-type accept
+/configure policy-options policy-statement "SR:export-overlay" default-action action-type reject
+
+/configure policy-options prefix-list "underlay" prefix 10.0.0.0/8 type range start-length 31
+/configure policy-options prefix-list "underlay" prefix 10.0.0.0/8 type range end-length 32
+/configure policy-options prefix-list "underlay" prefix 192.168.0.0/16 type range start-length 31
+/configure policy-options prefix-list "underlay" prefix 192.168.0.0/16 type range end-length 32
+
+/configure policy-options policy-statement "SR:import-underlay" default-action action-type accept
+/configure policy-options policy-statement "SR:export-underlay" entry 10 from prefix-list ["underlay"]
+/configure policy-options policy-statement "SR:export-underlay" entry 10 from family [ipv4]
+/configure policy-options policy-statement "SR:export-underlay" entry 10 action action-type accept
+/configure policy-options policy-statement "SR:export-underlay" default-action action-type reject
+
+/configure policy-options policy-statement "SR:export-DC-WAN" entry 10 from family [evpn]
+/configure policy-options policy-statement "SR:export-DC-WAN" entry 10 from community name "vxlan"
+/configure policy-options policy-statement "SR:export-DC-WAN" entry 10 action action-type reject
+/configure policy-options policy-statement "SR:export-DC-WAN" default-action action-type accept
+/configure policy-options policy-statement "SR:import-DC-WAN" default-action action-type accept
+
+#### This next policy is needed to avoid control plane loops when we have two DCGWs per DC
+# https://documentation.nokia.com/sr/25-3/7x50-shared/layer-2-services-evpn/ethernet-virtual-private-networks.html#ai9enrmqh4 
+#/configure policy-options community "SOO-DCGW-23" { member "origin:64500:23" }
+
+#/configure policy-options policy-statement "SR:export-overlay.dcgw" entry 10 from family [evpn]
+#/configure policy-options policy-statement "SR:export-overlay.dcgw" entry 10 from community name "vxlan"
+#/configure policy-options policy-statement "SR:export-overlay.dcgw" entry 10 from community name "MACVRF1-RT"
+
+#/configure policy-options policy-statement "SR:export-overlay.dcgw" entry 10 action action-type accept
+#/configure policy-options policy-statement "SR:export-overlay.dcgw" entry 10 action community add ["SOO-DCGW-23"]
+#/configure policy-options policy-statement "SR:export-overlay.dcgw" default-action action-type accept
+
+#/configure policy-options policy-statement "SR:import-overlay.dcgw" entry 10 from family [evpn]
+#/configure policy-options policy-statement "SR:import-overlay.dcgw" entry 10 from community name "SOO-DCGW-23"
+#/configure policy-options policy-statement "SR:import-overlay.dcgw" entry 10 action action-type reject
+
+#OVERLAY SERVICE
+/configure service vpls "MACVRF1" admin-state enable
+/configure service vpls "MACVRF1" service-id 1
+/configure service vpls "MACVRF1" customer "1"
+/configure service vpls "MACVRF1" vxlan instance 1 vni 1
+/configure service vpls "MACVRF1" bgp 1 route-distinguisher "10.255.1.1:1"
+/configure service vpls "MACVRF1" bgp 1 route-target export "target:64321:1"
+/configure service vpls "MACVRF1" bgp 1 route-target import "target:64321:1"
+/configure service vpls "MACVRF1" bgp 2 route-distinguisher "10.255.1.1:11"
+/configure service vpls "MACVRF1" bgp 2 route-target export "target:64321:666"
+/configure service vpls "MACVRF1" bgp 2 route-target import "target:64321:666"
+/configure service vpls "MACVRF1" bgp-evpn evi 1
+/configure service vpls "MACVRF1" bgp-evpn vxlan 1 admin-state enable
+/configure service vpls "MACVRF1" bgp-evpn vxlan 1 vxlan-instance 1
+/configure service vpls "MACVRF1" bgp-evpn vxlan 1 routes auto-disc advertise true
+/configure service vpls "MACVRF1" bgp-evpn mpls 2 admin-state enable
+/configure service vpls "MACVRF1" bgp-evpn mpls 2 ingress-replication-bum-label true
+/configure service vpls "MACVRF1" bgp-evpn mpls 2 ecmp 2
+/configure service vpls "MACVRF1" bgp-evpn mpls 2 auto-bind-tunnel resolution any
+/configure service vpls "MACVRF1" bgp-evpn mpls 2 control-word true
+
+## IES 
+/configure service system bgp evpn ethernet-segment "I-ES231" admin-state enable
+/configure service system bgp evpn ethernet-segment "I-ES231" type virtual
+/configure service system bgp evpn ethernet-segment "I-ES231" esi 0x00232323232323000001
+/configure service system bgp evpn ethernet-segment "I-ES231" multi-homing-mode all-active
+/configure service system bgp evpn ethernet-segment "I-ES231" df-election service-carving-mode auto
+/configure service system bgp evpn ethernet-segment "I-ES231" association network-interconnect-vxlan 1 virtual-ranges service-id 1 end 10
+/configure service system bgp evpn ethernet-segment "I-ES231" association network-interconnect-vxlan 1 virtual-ranges service-id 11 end 20
+
+## DCGW SAP
+/configure port 1/1/c3 admin-state enable
+/configure port 1/1/c3 description "dc1-cli2"
+/configure port 1/1/c3 connector breakout c1-100g
+/configure port 1/1/c3/1 admin-state enable
+/configure port 1/1/c3/1 description "dc1-cli2"
+/configure port 1/1/c3/1 ethernet mode access
+/configure port 1/1/c3/1 ethernet encap-type dot1q
+/configure port 1/1/c3/1 ethernet hold-time up 10
+/configure port 1/1/c3/1 ethernet mtu 9500
+
+/configure service vpls "MACVRF1" sap 1/1/c3/1:100 { }
+
+
+
+
+
+
+
+
+
+
+
+
+

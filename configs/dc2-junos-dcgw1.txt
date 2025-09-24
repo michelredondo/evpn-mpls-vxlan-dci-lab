@@ -1,0 +1,108 @@
+interfaces {
+    ge-0/0/0 {
+        vlan-tagging;
+        encapsulation flexible-ethernet-services;
+        unit 0 {
+            encapsulation vlan-bridge;
+            vlan-id 100;
+        }
+    }
+    ge-0/0/1 {
+        unit 0 {
+            family inet {
+                address 10.2.1.1/31;
+            }
+            family mpls;
+        }
+    }
+    ge-0/0/2 {
+        vlan-tagging;
+        encapsulation flexible-ethernet-services;
+        unit 0 {
+            encapsulation vlan-bridge;
+            vlan-id 100;
+        }
+    }
+    lo0 {
+        unit 0 {
+            family inet {
+                address 10.255.2.1/32;
+            }
+        }
+    }
+}
+policy-options {
+    policy-statement EXPORT-BGP-LU {
+        term 1 {
+            from protocol direct;
+            then accept;
+        }
+        term 2 {
+            from protocol local;
+            then accept;
+        }
+        term REJECT {
+            then reject;
+        }
+    }
+    policy-statement underlay {
+        term 1 {
+            from {
+                route-filter 10.255.2.1/32 prefix-length-range /32-/32;
+            }
+            then accept;
+        }
+    }
+}
+routing-instances {
+    mac-vrf1-mpls {
+        instance-type evpn;
+        protocols {
+            evpn {
+                default-gateway no-gateway-community;
+                control-word;
+            }
+        }
+        vlan-id none;
+        interface ge-0/0/2.0;
+        interface ge-0/0/0.0;
+        route-distinguisher 10.255.2.1:11;
+        vrf-target target:64321:666;
+    }
+}
+routing-options {
+    router-id 10.255.2.1;
+    autonomous-system 65001;
+}
+protocols {
+    bgp {
+        group Core-LBGP {
+            type external;
+            local-address 10.2.1.1;
+            family inet {
+                labeled-unicast {
+                    resolve-vpn;
+                }
+            }
+            export EXPORT-BGP-LU;
+            local-as 65225;
+            neighbor 10.2.1.0 {
+                peer-as 3456;
+            }
+        }
+        group WAN-DC-EVPN {
+            type internal;
+            local-address 10.255.2.1;
+            family evpn {
+                signaling;
+            }
+            peer-as 64512;
+            local-as 64512;
+            neighbor 10.255.1.1;
+            vpn-apply-export;
+        }
+    }
+    mpls {
+        interface ge-0/0/1.0;
+    }
+}

@@ -1,0 +1,89 @@
+/configure card 1 card-type iom-1
+/configure card 1 mda 1 mda-type me6-100gb-qsfp28
+/configure card 1 mda 2 mda-type me12-100gb-qsfp28
+
+/configure port 1/1/c1 admin-state enable
+/configure port 1/1/c1 description "dc1-dcgw"
+/configure port 1/1/c1 connector breakout c1-100g
+
+/configure port 1/1/c1/1 admin-state enable
+/configure port 1/1/c1/1 description "dc1-dcgw"
+/configure port 1/1/c1/1 ethernet mode hybrid
+/configure port 1/1/c1/1 ethernet encap-type dot1q
+
+/configure port 1/1/c2 admin-state enable
+/configure port 1/1/c2 description "dc2-dcgw"
+/configure port 1/1/c2 connector breakout c1-100g
+
+/configure port 1/1/c2/1 admin-state enable
+/configure port 1/1/c2/1 description "dc2-dcgw"
+/configure port 1/1/c2/1 ethernet mode hybrid
+/configure port 1/1/c2/1 ethernet encap-type dot1q
+
+
+/configure router "Base" interface "to-dc1-dcgw" ip-mtu 9000
+/configure router "Base" interface "to-dc1-dcgw" port 1/1/c1/1:1
+/configure router "Base" interface "to-dc1-dcgw" ipv4 primary address 10.1.1.0
+/configure router "Base" interface "to-dc1-dcgw" ipv4 primary prefix-length 31
+
+/configure router "Base" interface "to-dc2-dcgw" ip-mtu 9000
+/configure router "Base" interface "to-dc2-dcgw" port 1/1/c2/1:0
+/configure router "Base" interface "to-dc2-dcgw" ipv4 primary address 10.2.1.0
+/configure router "Base" interface "to-dc2-dcgw" ipv4 primary prefix-length 31
+
+/configure router "Base" interface "system" ipv4 icmp mask-reply false
+/configure router "Base" interface "system" ipv4 icmp redirects admin-state disable
+/configure router "Base" interface "system" ipv4 icmp unreachables admin-state disable
+/configure router "Base" interface "system" ipv4 bfd admin-state enable
+/configure router "Base" interface "system" ipv4 bfd transmit-interval 2000
+/configure router "Base" interface "system" ipv4 bfd receive 2000
+/configure router "Base" interface "system" ipv4 bfd type cpm-np
+/configure router "Base" interface "system" ipv4 primary address 10.255.255.255
+/configure router "Base" interface "system" ipv4 primary prefix-length 32
+
+/configure router "Base" icmp-tunneling true
+/configure router "Base" autonomous-system 64530
+/configure router "Base" ecmp 16
+/configure router "Base" router-id 10.255.255.255
+/configure router "Base" confederation confed-as-num 3456
+/configure router "Base" { confederation members 64530 }
+/configure router "Base" ttl-propagate lsr-label-route all
+
+/configure router "Base" bgp group "dc.label" type external
+/configure router "Base" bgp group "dc.label" aigp true
+/configure router "Base" bgp group "dc.label" advertise-inactive true
+/configure router "Base" bgp group "dc.label" label-preference 8
+/configure router "Base" bgp group "dc.label" family label-ipv4 true
+/configure router "Base" bgp group "dc.label" send-communities extended false
+/configure router "Base" bgp group "dc.label" import policy ["DELETE-RTs" "DC-FABRIC.Label-in"]
+/configure router "Base" bgp group "dc.label" export policy ["DC-FABRIC.Label-out"]
+/configure router "Base" bgp group "dc.label" prefix-limit label-ipv4 maximum 20
+/configure router "Base" bgp group "dc.label" prefix-limit label-ipv4 threshold 50
+/configure router "Base" bgp group "dc.label" prefix-limit label-ipv4 idle-timeout 5
+/configure router "Base" bgp group "dc.label" prefix-limit label-ipv4 post-import true
+/configure router "Base" bgp neighbor "10.1.1.1" description "dc1-dcgw"
+/configure router "Base" bgp neighbor "10.1.1.1" group "dc.label"
+/configure router "Base" bgp neighbor "10.1.1.1" local-address 10.1.1.0
+/configure router "Base" bgp neighbor "10.1.1.1" peer-as 65224
+/configure router "Base" bgp neighbor "10.2.1.1" description "dc2-dcgw"
+/configure router "Base" bgp neighbor "10.2.1.1" group "dc.label"
+/configure router "Base" bgp neighbor "10.2.1.1" local-address 10.2.1.0
+/configure router "Base" bgp neighbor "10.2.1.1" peer-as 65225
+
+
+/configure policy-options community "DELETE-RTs" { member "target:^.*$&^.*$" }
+/configure policy-options prefix-list "DC-SYS-AND-LOOPS" { prefix 10.255.1.1/32 type exact }
+/configure policy-options prefix-list "DC-SYS-AND-LOOPS" { prefix 10.255.2.1/32 type exact }
+
+/configure policy-options prefix-list "LOOPS" prefix 10.0.0.0/8 type range start-length 32
+/configure policy-options prefix-list "LOOPS" prefix 10.0.0.0/8 type range end-length 32
+/configure policy-options policy-statement "DC-FABRIC.Label-in" entry 10 from prefix-list ["DC-SYS-AND-LOOPS"]
+/configure policy-options policy-statement "DC-FABRIC.Label-in" entry 10 action action-type accept
+/configure policy-options policy-statement "DC-FABRIC.Label-in" entry 10 action advertise-label per-prefix
+/configure policy-options policy-statement "DC-FABRIC.Label-in" entry 10 action aigp-metric add 0
+/configure policy-options policy-statement "DC-FABRIC.Label-in" default-action action-type reject
+/configure policy-options policy-statement "DC-FABRIC.Label-out" entry 10 from prefix-list ["LOOPS"]
+/configure policy-options policy-statement "DC-FABRIC.Label-out" entry 10 action action-type accept
+/configure policy-options policy-statement "DC-FABRIC.Label-out" default-action action-type reject
+/configure policy-options policy-statement "DELETE-RTs" default-action action-type next-policy
+/configure policy-options policy-statement "DELETE-RTs" default-action community remove ["DELETE-RTs"]

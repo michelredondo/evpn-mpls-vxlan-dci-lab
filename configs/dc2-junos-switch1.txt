@@ -1,0 +1,30 @@
+interfaces {
+    ge-0/0/0 {
+        vlan-tagging;
+        encapsulation flexible-ethernet-services;
+        unit 0 {
+            encapsulation vlan-bridge;
+            vlan-id 100;
+        }
+    }
+    ge-0/0/1 {
+        vlan-tagging;
+        encapsulation flexible-ethernet-services;
+        unit 0 {
+            encapsulation vlan-bridge;
+            vlan-id 100;
+        }
+    }
+}
+routing-instances {
+    mac-vrf1 {
+        instance-type virtual-switch;
+        vlans {
+            vlan100 {
+                vlan-id 100;
+                interface ge-0/0/1.0;
+                interface ge-0/0/0.0;
+            }
+        }
+    }
+}
